@@ -1,6 +1,6 @@
 from config.src.log_bootstrap import setup_logging, get_logger
 setup_logging()
-logger = get_logger("scraper.litnet")
+logger = get_logger("scraper.litres")
 
 import requests
 from bs4 import BeautifulSoup
