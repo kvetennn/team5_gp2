@@ -117,3 +117,10 @@
 Датасет на 5 000 строк сохранён в форматах JSON и CSV (data/raw/litnet_books.json и data/raw/litnet_books_dataset.csv).
 
 ### Итоговый датасет
+
+### Логирование
+Как проверить логи: 
+```
+python -m config.src.tools.emit_log
+pip install pyyaml # (если не стоит)
+```
