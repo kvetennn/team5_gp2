@@ -57,6 +57,11 @@ dictConfig:
       handlers: [rotating_file, console]
       propagate: false
 
+    scraper.litres:
+      level: DEBUG
+      handlers: [rotating_file, console]
+      propagate: false
+
     eda.final: # data/processed/final.py
       level: INFO
       handlers: [rotating_file, console]
