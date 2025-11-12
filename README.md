@@ -172,6 +172,14 @@
 python -m config.src.tools.emit_log
 pip install pyyaml # (если не стоит)
 ```
+Запустить логирование:
+```
+python -m src.Author_Today
+python -m src.litnet_api
+python -m src.litnet_xml
+python -m src.litnet_unique_tags
+```
+Формат `python -m path`, `path` - путь к файлу
 
 # EDA Анализ
 Проведена очистка данных из объединённого датасета (Litres, AuthorToday, LitNet).
