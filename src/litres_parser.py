@@ -1,3 +1,7 @@
+from config.src.log_bootstrap import setup_logging, get_logger
+setup_logging()
+logger = get_logger("scraper.litnet")
+
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -7,31 +11,35 @@ import json
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-#прописываю общие условия
+# общие условия
 START_URL = "https://www.litres.ru/popular/?art_types=text_book&only_selfpublished_arts=true"
-MAX_PAGES = 5          
-MAX_BOOKS = 15000        
+MAX_PAGES = 5
+MAX_BOOKS = 15000
 OUTPUT_CSV = "litres_books_parallel.csv"
-DELAY_BETWEEN_REQUESTS = 0.3 #пауза чтоб задержки между парсингом были
-NUM_THREADS = 15 #кол-во параллельных потоков
+DELAY_BETWEEN_REQUESTS = 0.3
+NUM_THREADS = 15
 
-
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-"AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+    )
 }
 
-#загружаю html страницы по url 
-def get_page(url):
+# загружаю html страницы по url
+def get_page(url: str) -> str | None:
     try:
+        logger.debug("HTTP GET %s", url)
         r = requests.get(url, headers=HEADERS, timeout=15)
         r.raise_for_status()
         return r.text
-    except:
+    except Exception as e:
+        logger.error("GET failed for %s: %s", url, e, exc_info=True)
         return None
 
-def extract_book_links_from_catalog(html, base_url):
+def extract_book_links_from_catalog(html: str, base_url: str) -> set[str]:
     soup = BeautifulSoup(html, "lxml")
-    links = set()
+    links: set[str] = set()
     for a in soup.find_all("a", href=True):
         href = a["href"]
         full = urljoin(base_url, href)
@@ -39,9 +47,10 @@ def extract_book_links_from_catalog(html, base_url):
         if "litres.ru" in p.netloc and re.search(r"/book(?:/|$)", p.path):
             clean = p.scheme + "://" + p.netloc + p.path
             links.add(clean)
+    logger.debug("Extracted %d links from %s", len(links), base_url)
     return links
 
-def parse_book_page(html, url):
+def parse_book_page(html: str, url: str) -> dict:
     soup = BeautifulSoup(html, "lxml")
 
     data = {
@@ -63,11 +72,11 @@ def parse_book_page(html, url):
         "description": None,
     }
 
-    #ищу все скрипты с типом application/ld+json
+    # ищу все скрипты с типом application/ld+json
     for script in soup.find_all("script", type="application/ld+json"):
         try:
             jd = json.loads(script.string)
-        except:
+        except Exception:
             continue
 
         if isinstance(jd, list):
@@ -90,12 +99,12 @@ def parse_book_page(html, url):
             if isinstance(offers, dict):
                 data["price"] = offers.get("price")
 
-    #жанры, рейтинг и отзывы
+    # жанры
     genres = soup.select("a[data-test='book-genre-link'], a[href*='/genre/']")
     if genres:
         data["genres"] = ", ".join(g.get_text(strip=True) for g in genres)
 
-    #количество оценок
+    # количество оценок
     marks_el = soup.select_one('[data-testid="book-factoids__marks"]')
     if marks_el:
         text = marks_el.get_text(strip=True)
@@ -103,7 +112,7 @@ def parse_book_page(html, url):
         if match:
             data["rating_count"] = int(match.group())
 
-    #количество отзывов
+    # количество отзывов
     reviews_el = soup.select_one('[data-testid="book-factoids__reviews"] span')
     if reviews_el:
         text = reviews_el.get_text(strip=True)
@@ -111,7 +120,7 @@ def parse_book_page(html, url):
         if match:
             data["reviews_count"] = int(match.group())
 
-    # ещё доп характеристики
+    # доп. характеристики
     char_block = soup.select_one('div[data-testid="book-characteristics__wrapper"]')
     if char_block:
         for item in char_block.select('div.ddd308de'):
@@ -139,17 +148,13 @@ def parse_book_page(html, url):
                 formats = [a.get_text(strip=True) for a in item.select("a")]
                 data["formats"] = ", ".join(formats)
 
-    
-
-    #описание у книги
+    # описание
     desc = None
 
-    #официальный селектор
     description_block = soup.select_one('div[data-testid="book-description__text"]')
     if description_block:
         desc = description_block.get_text(" ", strip=True)
 
-    #самиздат короткое описание
     if not desc:
         alt_desc_block = soup.select_one('div._86af713b')
         if alt_desc_block:
@@ -157,7 +162,6 @@ def parse_book_page(html, url):
             if paragraphs:
                 desc = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
 
-    #самиздат длинное описание
     if not desc:
         long_desc_block = soup.select_one('div.ac83cc29')
         if long_desc_block:
@@ -165,45 +169,57 @@ def parse_book_page(html, url):
             if paragraphs:
                 desc = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
 
-    # очистка от лишних слов в описании
     if desc:
         desc = re.sub(r'(Далее|Свернуть)\s*$', '', desc).strip()
 
     data["description"] = desc
 
+    logger.debug("Parsed book: title=%r url=%s", data["title"], url)
     return data
 
 
+logger.info(
+    "Старт парсинга каталога Литрес: start_url=%s, max_pages=%d, max_books=%d, threads=%d",
+    START_URL, MAX_PAGES, MAX_BOOKS, NUM_THREADS
+)
 
-all_book_links = set()
+all_book_links: set[str] = set()
 
-#собираю ссылки на книги со страниц
-for p in range(1, MAX_PAGES+1):
+# собираю ссылки на книги со страниц
+for p in range(1, MAX_PAGES + 1):
     page_url = f"{START_URL}&page={p}"
     html = get_page(page_url)
     if not html:
+        logger.warning("Не удалось получить страницу каталога: %s", page_url)
         continue
-    links = extract_book_links_from_catalog(html, page_url)
 
-    
+    links = extract_book_links_from_catalog(html, page_url)
     print(f"\nСтраница {p}: найдено {len(links)} ссылок, всего уникальных: {len(all_book_links) + len(links)}")
+    logger.info("Каталог p=%d: найдено %d ссылок (накоплено уникальных ~%d)", p, len(links), len(all_book_links) + len(links))
 
     all_book_links.update(links)
     time.sleep(DELAY_BETWEEN_REQUESTS)
     if len(all_book_links) >= MAX_BOOKS:
+        logger.info("Достигнут лимит ссылок MAX_BOOKS=%d — остановка сбора каталога", MAX_BOOKS)
         break
 
 all_book_links = list(all_book_links)[:MAX_BOOKS]
 print(f"\nВсего уникальных ссылок для парсинга: {len(all_book_links)}")
+logger.info("Итого к парсингу: %d ссылок", len(all_book_links))
 
-#параллельный парсинг книг для ускорения (использую многопоточность)
-collected = []
+# параллельный парсинг книг
+collected: list[dict] = []
 
-def fetch_book(url):
+def fetch_book(url: str) -> dict | None:
     html = get_page(url)
     if not html:
+        logger.warning("Пропущена книга (нет html): %s", url)
         return None
-    return parse_book_page(html, url)
+    try:
+        return parse_book_page(html, url)
+    except Exception as e:
+        logger.exception("Ошибка парсинга книги %s: %s", url, e)
+        return None
 
 with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
     futures = {executor.submit(fetch_book, url): url for url in all_book_links}
@@ -212,10 +228,10 @@ with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
         if result:
             collected.append(result)
         if i % 50 == 0:
-            print(f"Пройдено {i}/{len(all_book_links)} книг, сохранено {len(collected)}")
+            logger.info("Пройдено %d/%d книг, сохранено %d (временный сейв)", i, len(all_book_links), len(collected))
             pd.DataFrame(collected).to_csv(OUTPUT_CSV, index=False, encoding="utf-8-sig")
-
 
 df = pd.DataFrame(collected)
 df.to_csv(OUTPUT_CSV, index=False, encoding="utf-8-sig")
+logger.info("Готово. Сохранён CSV: %s (строк: %d)", OUTPUT_CSV, len(df))
 print(df.head())
