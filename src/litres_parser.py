@@ -1,6 +1,3 @@
-# Установи зависимости (если ещё не установлены)
-#!pip install beautifulsoup4 lxml
-
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
