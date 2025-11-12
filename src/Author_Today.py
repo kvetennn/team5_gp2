@@ -1,10 +1,13 @@
+from src.log_bootstrap import setup_logging, get_logger
+setup_logging()
+logger = get_logger("scraper.author_today")
+
 import requests
 from bs4 import BeautifulSoup
 import csv
 import time
 import re
 import pandas as pd
-
 
 def parse_author_today():
     base_url = "https://author.today/work/genre/all/ebook"
@@ -18,6 +21,8 @@ def parse_author_today():
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     
+    logger.info("Старт парсинга Author.Today: base_url=%s, sorting=%s, state=%s", base_url, params['sorting'], params['state'])
+
     all_books = []
     page = 1
     max_pages = 400
@@ -25,15 +30,19 @@ def parse_author_today():
     
     while page <= max_pages and len(all_books) < 10000:
         print(f"Страница {page}...")
+        logger.info("Обрабатываю страницу %d (накоплено записей: %d)", page, len(all_books))
         
         try:
             params['page'] = page
+            logger.debug("HTTP GET %s, params=%s", base_url, params)
             response = requests.get(base_url, params=params, headers=headers, timeout=30)
             soup = BeautifulSoup(response.content, 'html.parser')
             
             cards = soup.find_all('div', class_='book-row')
+            logger.debug("Найдено карточек на странице: %d", 0 if not cards else len(cards))
             
             if not cards:
+                logger.info("Карточек не найдено — останавливаюсь на странице %d", page)
                 break
                 
             for card in cards:
@@ -41,11 +50,13 @@ def parse_author_today():
                 if book_data['title']:
                     all_books.append(book_data)
             
+            logger.info("Страница %d обработана. Всего записей: %d", page, len(all_books))
             page += 1
             time.sleep(0.5)
             
         except Exception as e:
             print(f"Ошибка: {e}")
+            logger.exception("Ошибка на странице %d: %s", page, e)
             break
     
     if all_books:
@@ -59,7 +70,11 @@ def parse_author_today():
         
         print(f"Готово! Собрано {len(all_books)} книг")
         print(f"Файл: {filename}")
-    
+        logger.info("Сохранён CSV: %s (строк: %d)", filename, len(all_books))
+    else:
+        logger.warning("Данные не собраны — all_books пуст")
+
+    logger.info("Завершение парсинга Author.Today. Итоговое количество: %d", len(all_books))
     return all_books
 
 def extract_book_data(card):
@@ -109,6 +124,9 @@ def extract_book_data(card):
     annotation = annotation_elem.get_text(strip=True) if annotation_elem else ""
     annotation = ' '.join(annotation.split())
     
+    # Доп. диагностический лог на уровне DEBUG
+    logger.debug("Книга распознана: title=%r, authors=%r", title, authors)
+
     return {
         'title': title,
         'authors': authors,
