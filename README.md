@@ -8,7 +8,8 @@
   - [LitRes](#LitRes)
   - [Author.Today](#Author-Today)
   - [Litnet](#Litnet-api)
-  - [Объединенные данные](#объединенные-данные) 
+  - [Объединенные данные](#объединенные-данные)
+- [Логирование](#логирование)
 - [EDA анализ](#eda-анализ)  
 - [Выводы и рекомендации](#Выводы-и-рекомендации)
 
@@ -117,10 +118,60 @@
 Датасет на 5 000 строк сохранён в форматах JSON и CSV (data/raw/litnet_books.json и data/raw/litnet_books_dataset.csv).
 
 ### Итоговый датасет
+• title — название книги
 
-### Логирование
+• authors — автор книги
+
+• genre — жанры книги (через запятую или список)
+
+• description — аннотация книги (описание сюжета)
+
+• desc_len — длина аннотации в символах
+
+• author_books_count — количество опубликованных книг у автора
+
+• is_series — принадлежит ли книга к серии (1 — да, 0 — нет)
+
+• views_authoday — количество просмотров книги на Author.Today
+
+• likes_authoday — количество лайков на Author.Today
+
+• comments_authoday — количество комментариев
+
+• reviews_authoday — количество отзывов пользователей
+
+• price_authoday — цена книги на Author.Today, ₽
+
+• year_authoday — год публикации книги на Author.Today
+
+• rating_litres — средний рейтинг книги на ЛитРес
+
+• rating_count_litres — количество оценок на ЛитРес
+
+• reviews_count_litres — количество отзывов на ЛитРес
+
+• price_litres — цена книги на ЛитРес, ₽
+
+• year_litres — год выхода книги на ЛитРес
+
+• price_litnet — цена книги на ЛитНет, ₽
+
+• year_litnet — год выхода книги на ЛитНет
+
+• has_litres — флаг наличия книги на ЛитРес (1 — есть, 0 — нет)
+
+• has_litnet — флаг наличия книги на ЛитНет
+
+• has_authoday — флаг наличия книги на Author.Today
+
+• cycle_authoday — название серии или цикла, если книга является её частью
+
+# Логирование
 Как проверить логи: 
 ```
 python -m config.src.tools.emit_log
 pip install pyyaml # (если не стоит)
 ```
+
+# EDA Анализ
+# Выводы
