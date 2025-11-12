@@ -13,6 +13,7 @@ FILE_TO_LOGGER = {
     "litnet_api.py":        "scraper.litnet_api",
     "litnet_unique_tags.py":"scraper.litnet_unique_tags",
     "litnet_xml.py":        "scraper.litnet_xml",
+    "litres_parser.py":     "scraper.litres",
     "final.py":             "eda.final",
     "merge.ipynb":          "notebooks.merge",
 }
